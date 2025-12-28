@@ -27,6 +27,13 @@ enum Commands {
 }
 
 fn main() {
-    let cli = CLI::parse();
+    let cli = CLI::try_parse();
+    let cli = match cli {
+        Err(e) => {
+            eprintln!("Error parsing command line arguments\n\n{}", e);
+            std::process::exit(1);
+        }
+        Ok(cli) => cli,
+    };
     println!("Action: {:?}", cli.command);
 }
