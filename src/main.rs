@@ -61,8 +61,39 @@ fn main() {
                 Ok(_) => {}
             }
         }
-        _ => {
-            println!("Command not implemented yet.");
+        Commands::Get { key } => {
+            let get = commands::get(&home_dir, &key);
+            match get {
+                Err(e) => {
+                    eprintln!("Error getting password for key '{}'\n\n{}", key, e);
+                    std::process::exit(1);
+                }
+                Ok(_) => {}
+            }
+        }
+        Commands::Set { key, value } => {
+            let set = commands::set(&home_dir, &key, &value);
+            match set {
+                Err(e) => {
+                    eprintln!("Error setting password for key '{}'\n\n{}", key, e);
+                    std::process::exit(1);
+                }
+                Ok(_) => {}
+            }
+        }
+        Commands::Generate {
+            key,
+            special_chars,
+            length,
+        } => {
+            let generate = commands::generate(&home_dir, &key, special_chars, length);
+            match generate {
+                Err(e) => {
+                    eprintln!("Error generating password for key '{}'\n\n{}", key, e);
+                    std::process::exit(1);
+                }
+                Ok(_) => {}
+            }
         }
     }
 }

@@ -1,6 +1,5 @@
 use std::{
     fs::{self, File},
-    io::Write,
     path::PathBuf,
 };
 
@@ -8,11 +7,11 @@ use inquire::Confirm;
 use toml::{Table, Value};
 
 const PASSWORDS_FILE: &str = "liujip0-password-manager.toml";
-const VERSION_KEY: &str = "__PASSWORD_MANAGER_VERSION__";
+pub(crate) const VERSION_KEY: &str = "__PASSWORD_MANAGER_VERSION__";
 
 pub fn get_passwords_from_file(dir: &PathBuf) -> Result<Table, String> {
     let file_path = dir.join(PASSWORDS_FILE);
-    create_file_if_not_exists(&file_path)?;
+    create_file_if_not_exists(&dir)?;
 
     let file = fs::read_to_string(&file_path);
     let file = match file {
@@ -27,7 +26,7 @@ pub fn get_passwords_from_file(dir: &PathBuf) -> Result<Table, String> {
     };
 
     let passwords = toml::from_str::<Table>(&file);
-    let mut passwords = match passwords {
+    let passwords = match passwords {
         Err(e) => {
             return Err(format!(
                 "Could not parse passwords file at {} as TOML format\n\n{}",
@@ -39,19 +38,79 @@ pub fn get_passwords_from_file(dir: &PathBuf) -> Result<Table, String> {
     };
 
     if passwords.get(VERSION_KEY) == Some(&Value::String(env!("CARGO_PKG_VERSION").to_string())) {
-        passwords.remove(VERSION_KEY);
         return Ok(passwords);
     } else {
+        let file_version = passwords.get(VERSION_KEY);
+        let file_version = match file_version {
+            Some(Value::String(v)) => v,
+            _ => "[unknown version]",
+        };
+
         println!(
             "Warning: Passwords file version ({}) does not match application version ({}).",
-            passwords[VERSION_KEY],
+            file_version,
             env!("CARGO_PKG_VERSION")
         );
-        return Err("Passwords file version mismatch.".to_string())?;
+
+        let remake_file = remake_bad_file(&dir);
+        match remake_file {
+            Err(e) => return Err(e),
+            Ok(_) => {
+                print!("Retrying...");
+                return get_passwords_from_file(dir);
+            }
+        }
     }
 }
 
-fn create_file_if_not_exists(file_path: &PathBuf) -> Result<(), String> {
+fn remake_bad_file(dir: &PathBuf) -> Result<(), String> {
+    let file_path = dir.join(PASSWORDS_FILE);
+
+    println!(
+        "The passwords file at {} is corrupted.",
+        file_path.display()
+    );
+
+    let recreate_file = Confirm::new("Recreate the passwords file?")
+        .with_default(false)
+        .with_help_message("All stored passwords will be lost.")
+        .prompt();
+    let recreate_file = match recreate_file {
+        Err(e) => {
+            return Err(format!(
+                "Could not get user confirmation to recreate passwords file\n\n{}",
+                e
+            ));
+        }
+        Ok(choice) => choice,
+    };
+
+    if !recreate_file {
+        println!("Not recreating passwords file. Quitting...");
+        return Err("Corrupted passwords file.".to_string());
+    }
+
+    println!("Recreating passwords file at: {}", &file_path.display());
+    let remove_file = fs::remove_file(&file_path);
+    match remove_file {
+        Err(e) => {
+            return Err(format!(
+                "Could not remove corrupted passwords file at {}\n\n{}",
+                &file_path.display(),
+                e
+            ));
+        }
+        Ok(_) => {
+            println!("Corrupted passwords file removed.");
+        }
+    };
+
+    create_file_if_not_exists(dir)
+}
+
+fn create_file_if_not_exists(dir: &PathBuf) -> Result<(), String> {
+    let file_path = dir.join(PASSWORDS_FILE);
+
     if file_path.exists() {
         println!("Passwords file exists at: {}", file_path.display());
         return Ok(());
@@ -79,12 +138,12 @@ fn create_file_if_not_exists(file_path: &PathBuf) -> Result<(), String> {
     }
 
     println!("Creating passwords file at: {}", file_path.display());
-    let file = File::create_new(file_path);
-    let mut file = match file {
+    let file = File::create_new(&file_path);
+    match file {
         Err(e) => {
             return Err(format!(
                 "Could not create passwords file at {}\n\n{}",
-                file_path.display(),
+                &file_path.display(),
                 e
             ));
         }
@@ -100,10 +159,12 @@ fn create_file_if_not_exists(file_path: &PathBuf) -> Result<(), String> {
         Value::String(env!("CARGO_PKG_VERSION").to_string()),
     );
 
-    write_to_file(file_path, &init_config)
+    write_to_file(&dir, &init_config)
 }
 
-fn write_to_file(file_path: &PathBuf, contents: &Table) -> Result<(), String> {
+pub fn write_to_file(dir: &PathBuf, contents: &Table) -> Result<(), String> {
+    let file_path = dir.join(PASSWORDS_FILE);
+
     let contents = toml::to_string_pretty(contents);
     let contents = match contents {
         Err(e) => {
@@ -115,12 +176,12 @@ fn write_to_file(file_path: &PathBuf, contents: &Table) -> Result<(), String> {
         Ok(contents) => contents,
     };
 
-    let write = fs::write(file_path, contents);
+    let write = fs::write(&file_path, contents);
     match write {
         Err(e) => {
             return Err(format!(
                 "Could not write contents to file at {}\n\n{}",
-                file_path.display(),
+                &file_path.display(),
                 e
             ));
         }
