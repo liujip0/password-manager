@@ -1,9 +1,13 @@
 use std::path::PathBuf;
 
+use inquire::{Confirm, CustomType, Text};
 use rand::Rng;
 use toml::Value;
 
-use crate::storage::{self, write_to_file};
+use crate::{
+    password,
+    storage::{self, write_to_file},
+};
 
 pub fn list(dir: &PathBuf) -> Result<(), String> {
     let mut passwords = storage::get_passwords_from_file(dir)?;
@@ -22,10 +26,40 @@ pub fn list(dir: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-pub fn get(dir: &PathBuf, key: &str) -> Result<(), String> {
+pub fn get(
+    dir: &PathBuf,
+    key: &Option<String>,
+    master_password: &Option<String>,
+) -> Result<(), String> {
+    let key = match key {
+        Some(k) => k,
+        None => &{
+            let key_input = Text::new("Key: ").prompt();
+            match key_input {
+                Err(e) => {
+                    return Err(format!("Could not read key input.\n\n{}", e));
+                }
+                Ok(k) => k,
+            }
+        },
+    };
+
+    let master_password = match master_password {
+        Some(mp) => mp,
+        None => &{
+            let master_password_input = Text::new("Master password:").prompt();
+            match master_password_input {
+                Err(e) => {
+                    return Err(format!("Could not read master password input.\n\n{}", e));
+                }
+                Ok(mp) => mp,
+            }
+        },
+    };
+
     let passwords = storage::get_passwords_from_file(dir)?;
 
-    match passwords.get(key) {
+    let password = match passwords.get(key) {
         Some(value) => {
             let value = match value {
                 Value::String(s) => s,
@@ -35,25 +69,83 @@ pub fn get(dir: &PathBuf, key: &str) -> Result<(), String> {
             };
 
             let value = match value.strip_prefix('"') {
-                Some(v) => &v.to_string(),
+                Some(v) => v,
                 None => value,
             };
             let value = match value.strip_suffix('"') {
-                Some(v) => &v.to_string(),
+                Some(v) => v,
                 None => value,
             };
 
-            println!("Password for '{}':\n{}", key, value);
-            Ok(())
+            value
         }
-        None => Err(format!("No password found for key '{}'.", key)),
-    }
+        None => return Err(format!("No password found for key '{}'.", key)),
+    };
+
+    let decrypted_password = password::decrypt(password, &master_password);
+    let decrypted_password = match decrypted_password {
+        Err(e) => {
+            return Err(format!(
+                "Could not decrypt password for key '{}'.\n\n{}",
+                key, e
+            ));
+        }
+        Ok(dp) => dp,
+    };
+
+    println!("Password for '{}':\n{}", key, decrypted_password);
+    Ok(())
 }
 
-pub fn set(dir: &PathBuf, key: &str, value: &str) -> Result<(), String> {
+pub fn set(
+    dir: &PathBuf,
+    key: &Option<String>,
+    value: &Option<String>,
+    master_password: &Option<String>,
+) -> Result<(), String> {
+    let key = match key {
+        Some(k) => k,
+        None => &{
+            let key_input = Text::new("Key: ").prompt();
+            match key_input {
+                Err(e) => {
+                    return Err(format!("Could not read key input.\n\n{}", e));
+                }
+                Ok(k) => k,
+            }
+        },
+    };
+
+    let value = match value {
+        Some(v) => v,
+        None => &{
+            let value_input = Text::new("Password: ").prompt();
+            match value_input {
+                Err(e) => {
+                    return Err(format!("Could not read password input.\n\n{}", e));
+                }
+                Ok(v) => v,
+            }
+        },
+    };
+
+    let master_password = match master_password {
+        Some(mp) => mp,
+        None => &{
+            let master_password_input = Text::new("Master password:").prompt();
+            match master_password_input {
+                Err(e) => {
+                    return Err(format!("Could not read master password input.\n\n{}", e));
+                }
+                Ok(mp) => mp,
+            }
+        },
+    };
+
     let mut passwords = storage::get_passwords_from_file(dir)?;
 
-    passwords.insert(key.to_string(), Value::String(value.to_string()));
+    let encrypted_password = password::encrypt(value, &master_password)?;
+    passwords.insert(key.to_string(), Value::String(encrypted_password));
 
     let write = storage::write_to_file(&dir, &passwords);
     match write {
@@ -70,10 +162,69 @@ pub fn set(dir: &PathBuf, key: &str, value: &str) -> Result<(), String> {
 
 pub fn generate(
     dir: &PathBuf,
-    key: &str,
-    special_chars: bool,
-    length: usize,
+    key: &Option<String>,
+    special_chars: Option<bool>,
+    length: Option<usize>,
+    master_password: &Option<String>,
 ) -> Result<(), String> {
+    let key = match key {
+        Some(k) => k,
+        None => &{
+            let key_input = Text::new("Key: ").prompt();
+            match key_input {
+                Err(e) => {
+                    return Err(format!("Could not read key input.\n\n{}", e));
+                }
+                Ok(k) => k,
+            }
+        },
+    };
+
+    let special_chars = match special_chars {
+        Some(s) => s,
+        None => {
+            let special_chars_input = Confirm::new("Include special characters?")
+                .with_default(true)
+                .prompt();
+            match special_chars_input {
+                Err(e) => {
+                    return Err(format!("Could not read special characters input.\n\n{}", e));
+                }
+                Ok(s) => s,
+            }
+        }
+    };
+
+    let length = match length {
+        Some(l) => l,
+        None => {
+            let length_input = CustomType::<usize>::new("Password length: ")
+                .with_default(32)
+                .with_error_message("Please enter a valid number.")
+                .with_help_message("Recommended length is at least 12.")
+                .prompt();
+            match length_input {
+                Err(e) => {
+                    return Err(format!("Could not read password length input.\n\n{}", e));
+                }
+                Ok(l) => l,
+            }
+        }
+    };
+
+    let master_password = match master_password {
+        Some(mp) => mp,
+        None => &{
+            let master_password_input = Text::new("Master password:").prompt();
+            match master_password_input {
+                Err(e) => {
+                    return Err(format!("Could not read master password input.\n\n{}", e));
+                }
+                Ok(mp) => mp,
+            }
+        },
+    };
+
     let alphanumeric_chars: Vec<char> =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
             .to_string()
@@ -106,7 +257,8 @@ pub fn generate(
         .collect();
 
     let mut passwords = storage::get_passwords_from_file(dir)?;
-    passwords.insert(key.to_string(), Value::String(password.clone()));
+    let encrypted_password = password::encrypt(&password, &master_password)?;
+    passwords.insert(key.to_string(), Value::String(encrypted_password));
     write_to_file(dir, &passwords)?;
 
     println!("Generated and saved password for '{}':\n{}", key, password);

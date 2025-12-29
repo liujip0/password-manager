@@ -1,6 +1,7 @@
 use clap::{ArgAction, Parser, Subcommand};
 
 mod commands;
+mod password;
 mod storage;
 
 #[derive(Parser)]
@@ -14,18 +15,24 @@ struct CLI {
 enum Commands {
     List,
     Get {
-        key: String,
+        key: Option<String>,
+        #[arg(short, long = "master")]
+        master_password: Option<String>,
     },
     Set {
-        key: String,
-        value: String,
+        key: Option<String>,
+        value: Option<String>,
+        #[arg(short, long = "master")]
+        master_password: Option<String>,
     },
     Generate {
-        key: String,
-        #[arg(short, long = "special", default_value_t = true, action = ArgAction::SetFalse)]
-        special_chars: bool,
-        #[arg(short, long, default_value_t = 32)]
-        length: usize,
+        key: Option<String>,
+        #[arg(short, long = "special", action=ArgAction::Set)]
+        special_chars: Option<bool>,
+        #[arg(short, long)]
+        length: Option<usize>,
+        #[arg(short, long = "master")]
+        master_password: Option<String>,
     },
 }
 
@@ -48,52 +55,29 @@ fn main() {
         }
     };
 
-    println!("Action: {:?}", cli.command);
-
-    match cli.command {
-        Commands::List => {
-            let list = commands::list(&home_dir);
-            match list {
-                Err(e) => {
-                    eprintln!("Error listing passwords\n\n{}", e);
-                    std::process::exit(1);
-                }
-                Ok(_) => {}
-            }
-        }
-        Commands::Get { key } => {
-            let get = commands::get(&home_dir, &key);
-            match get {
-                Err(e) => {
-                    eprintln!("Error getting password for key '{}'\n\n{}", key, e);
-                    std::process::exit(1);
-                }
-                Ok(_) => {}
-            }
-        }
-        Commands::Set { key, value } => {
-            let set = commands::set(&home_dir, &key, &value);
-            match set {
-                Err(e) => {
-                    eprintln!("Error setting password for key '{}'\n\n{}", key, e);
-                    std::process::exit(1);
-                }
-                Ok(_) => {}
-            }
-        }
+    let result = match cli.command {
+        Commands::List => commands::list(&home_dir),
+        Commands::Get {
+            key,
+            master_password,
+        } => commands::get(&home_dir, &key, &master_password),
+        Commands::Set {
+            key,
+            value,
+            master_password,
+        } => commands::set(&home_dir, &key, &value, &master_password),
         Commands::Generate {
             key,
             special_chars,
             length,
-        } => {
-            let generate = commands::generate(&home_dir, &key, special_chars, length);
-            match generate {
-                Err(e) => {
-                    eprintln!("Error generating password for key '{}'\n\n{}", key, e);
-                    std::process::exit(1);
-                }
-                Ok(_) => {}
-            }
+            master_password,
+        } => commands::generate(&home_dir, &key, special_chars, length, &master_password),
+    };
+    match result {
+        Err(e) => {
+            eprintln!("Error executing command\n\n{}", e);
+            std::process::exit(1);
         }
+        Ok(_) => {}
     }
 }
