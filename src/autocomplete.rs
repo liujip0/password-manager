@@ -10,7 +10,7 @@ impl Autocomplete for KeyCompleter {
         let filtered_keys: Vec<String> = self
             .keys
             .iter()
-            .filter(|k| k.starts_with(input))
+            .filter(|k| k.to_uppercase().starts_with(input.to_uppercase().as_str()))
             .cloned()
             .collect();
 
@@ -26,7 +26,11 @@ impl Autocomplete for KeyCompleter {
             return Ok(Replacement::Some(highlighted_suggestion.unwrap()));
         }
 
-        let completion = self.keys.iter().filter(|k| k.starts_with(input)).nth(0);
+        let completion = self
+            .keys
+            .iter()
+            .filter(|k| k.to_uppercase().starts_with(input.to_uppercase().as_str()))
+            .nth(0);
         match completion {
             Some(c) => Ok(Replacement::Some(c.clone())),
             None => Ok(Replacement::None),
