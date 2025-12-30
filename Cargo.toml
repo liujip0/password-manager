@@ -1,7 +1,13 @@
 [package]
-name = "password-manager"
+name = "liujip0-password-manager"
 version = "0.1.0"
 edition = "2024"
+authors = ["liujip0"]
+description = "VERY INSECURE simple password manager CLI application written in Rust. This was written as a hobby project, and please do not use it to store actual passwords!"
+readme = "README.md"
+repository = "https://github.com/liujip0/password-manager"
+license = "MIT"
+license-file = "LICENSE.md"
 
 [dependencies]
 clap = { version = "4.5.53", features = ["derive"] }

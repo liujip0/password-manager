@@ -17,18 +17,22 @@ struct CLI {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    #[clap(aliases = ["ls", "l"])]
     List,
+    #[clap(aliases = ["g"])]
     Get {
         key: Option<String>,
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
+    #[clap(aliases = ["s", "add"])]
     Set {
         key: Option<String>,
         value: Option<String>,
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
+    #[clap(aliases = ["gen"])]
     Generate {
         key: Option<String>,
         #[arg(short, long = "special", action=ArgAction::Set)]
@@ -38,6 +42,7 @@ enum Commands {
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
+    #[clap(aliases = ["exp", "ex", "backup", "out"])]
     Export {
         #[arg(short, long = "file")]
         file_path: Option<String>,
@@ -46,6 +51,7 @@ enum Commands {
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
+    #[clap(aliases = ["in", "restore", "load"])]
     Import {
         #[arg(short, long = "file")]
         file_path: Option<String>,
@@ -72,21 +78,23 @@ impl fmt::Display for ExportType {
     }
 }
 
-fn main() -> Result<(), String> {
+fn main() {
     let cli = CLI::try_parse();
     let cli = match cli {
         Err(e) => {
-            return Err(format!("Could not parse command line arguments.\n\n{}", e));
+            println!("{}", e);
+            return;
         }
         Ok(cli) => cli,
     };
 
     let home_dir = std::env::home_dir();
     let Some(home_dir) = home_dir else {
-        return Err("Could not determine home directory".to_string());
+        println!("Could not determine home directory.");
+        return;
     };
 
-    match cli.command {
+    let result = match cli.command {
         Commands::List => commands::list(&home_dir),
         Commands::Get {
             key,
@@ -113,5 +121,8 @@ fn main() -> Result<(), String> {
             master_password,
             overwrite,
         } => backup::import_from_file(&home_dir, &file_path, &master_password, overwrite),
-    }
+    };
+    if let Err(e) = result {
+        println!("{}", e);
+    };
 }
