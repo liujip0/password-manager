@@ -1,5 +1,8 @@
-use clap::{ArgAction, Parser, Subcommand};
+use std::fmt::{self};
 
+use clap::{ArgAction, Parser, Subcommand, ValueEnum};
+
+mod backup;
 mod commands;
 mod password;
 mod storage;
@@ -34,6 +37,30 @@ enum Commands {
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
+    Export {
+        #[arg(short, long = "file")]
+        file_path: Option<String>,
+        #[arg(short = 't', long = "type")]
+        file_type: Option<ExportType>,
+        #[arg(short, long = "master")]
+        master_password: Option<String>,
+    },
+}
+#[derive(Debug, Clone, ValueEnum)]
+enum ExportType {
+    Json,
+    Csv,
+    Toml,
+}
+impl fmt::Display for ExportType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            ExportType::Json => "json",
+            ExportType::Csv => "csv",
+            ExportType::Toml => "toml",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 fn main() -> Result<(), String> {
@@ -67,5 +94,10 @@ fn main() -> Result<(), String> {
             length,
             master_password,
         } => commands::generate(&home_dir, &key, special_chars, length, &master_password),
+        Commands::Export {
+            file_path,
+            file_type,
+            master_password,
+        } => backup::export_to_file(&home_dir, &file_path, &file_type, &master_password),
     }
 }
