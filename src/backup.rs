@@ -4,7 +4,7 @@ use clap::ValueEnum;
 use inquire::{Confirm, Select, Text};
 use toml::{Table, Value};
 
-use crate::{ExportType, password, storage};
+use crate::{ExportType, logs::write_to_log, password, storage};
 
 pub fn export_to_file(
     dir: &PathBuf,
@@ -145,6 +145,10 @@ pub fn export_to_file(
             ));
         }
         Ok(_) => {
+            write_to_log(
+                dir,
+                format!("Exported all passwords to file {}", &export_path.display()).as_str(),
+            )?;
             println!(
                 "Passwords successfully exported to {}",
                 &export_path.display()
@@ -301,6 +305,11 @@ pub fn import_from_file(
 
     let mut current_passwords = storage::get_passwords_from_file(dir)?;
 
+    write_to_log(
+        dir,
+        format!("Importing passwords from file {}", &import_path.display()).as_str(),
+    )?;
+
     for (k, v) in imported_passwords.iter() {
         if k == storage::VERSION_KEY {
             continue;
@@ -325,17 +334,36 @@ pub fn import_from_file(
                     Some(Value::String(op)) => op,
                     _ => "[non-string value]".to_string(),
                 };
+
+                write_to_log(
+                    dir,
+                    format!(
+                        "Overwrote password for key {}. Previous value: {}",
+                        k,
+                        password::decrypt(&old_password, master_password)?
+                    )
+                    .as_str(),
+                )?;
                 println!(
                     "Password for key {} overwritten (old value: {:?}).",
                     k,
                     password::decrypt(&old_password, master_password)?
                 );
             } else {
+                write_to_log(
+                    dir,
+                    format!(
+                        "Skipped importing password for key {} as it already exists.",
+                        k
+                    )
+                    .as_str(),
+                )?;
                 println!("Password already exists for key {}. Skipping...", k);
                 continue;
             }
         } else {
             current_passwords.insert(k.clone(), Value::String(encrypted_password));
+            write_to_log(dir, format!("Imported password for key {}.", k).as_str())?;
             println!("Password for key {} imported.", k);
         }
     }

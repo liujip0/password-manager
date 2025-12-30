@@ -2,9 +2,12 @@ use std::fmt::{self};
 
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
+use crate::logs::write_to_log;
+
 mod autocomplete;
 mod backup;
 mod commands;
+mod logs;
 mod password;
 mod storage;
 
@@ -17,14 +20,17 @@ struct CLI {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    /// List the keys of all stored passwords
     #[clap(aliases = ["ls", "l"])]
     List,
+    /// Get a stored password by its key
     #[clap(aliases = ["g"])]
     Get {
         key: Option<String>,
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
+    /// Set a password for a given key
     #[clap(aliases = ["s", "add"])]
     Set {
         key: Option<String>,
@@ -32,6 +38,7 @@ enum Commands {
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
+    /// Generate a random password and store it with the given key
     #[clap(aliases = ["gen"])]
     Generate {
         key: Option<String>,
@@ -42,6 +49,7 @@ enum Commands {
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
+    /// Export all stored passwords to a plaintext file
     #[clap(aliases = ["exp", "ex", "backup", "out"])]
     Export {
         #[arg(short, long = "file")]
@@ -51,6 +59,7 @@ enum Commands {
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
+    /// Import passwords from a file
     #[clap(aliases = ["in", "restore", "load"])]
     Import {
         #[arg(short, long = "file")]
@@ -79,6 +88,18 @@ impl fmt::Display for ExportType {
 }
 
 fn main() {
+    let home_dir = std::env::home_dir();
+    let Some(home_dir) = home_dir else {
+        println!("Could not determine home directory.");
+        return;
+    };
+
+    write_to_log(
+        &home_dir,
+        format!("Application started. Version {}", env!("CARGO_PKG_VERSION")).as_str(),
+    )
+    .unwrap_or(());
+
     let cli = CLI::try_parse();
     let cli = match cli {
         Err(e) => {
@@ -86,12 +107,6 @@ fn main() {
             return;
         }
         Ok(cli) => cli,
-    };
-
-    let home_dir = std::env::home_dir();
-    let Some(home_dir) = home_dir else {
-        println!("Could not determine home directory.");
-        return;
     };
 
     let result = match cli.command {
@@ -123,6 +138,7 @@ fn main() {
         } => backup::import_from_file(&home_dir, &file_path, &master_password, overwrite),
     };
     if let Err(e) = result {
+        write_to_log(&home_dir, format!("Error occurred: {}", &e).as_str()).unwrap_or(());
         println!("{}", e);
     };
 }

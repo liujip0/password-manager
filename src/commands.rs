@@ -5,7 +5,9 @@ use rand::Rng;
 use toml::Value;
 
 use crate::{
-    autocomplete, password,
+    autocomplete,
+    logs::write_to_log,
+    password,
     storage::{self, write_to_file},
 };
 
@@ -23,6 +25,7 @@ pub fn list(dir: &PathBuf) -> Result<(), String> {
     for key in passwords.keys() {
         println!("- {}", key);
     }
+    write_to_log(dir, "Listed all stored passwords.")?;
     Ok(())
 }
 
@@ -100,6 +103,7 @@ pub fn get(
         Ok(dp) => dp,
     };
 
+    write_to_log(dir, format!("Retrieved password for key {}.", key).as_str())?;
     println!("Password for '{}':\n{}", key, decrypted_password);
     Ok(())
 }
@@ -168,6 +172,7 @@ pub fn set(
             e
         )),
         Ok(_) => {
+            write_to_log(dir, format!("Set password for key {}.", key).as_str())?;
             println!("Password for '{}' set successfully.", key);
             Ok(())
         }
@@ -283,6 +288,7 @@ pub fn generate(
     passwords.insert(key.to_string(), Value::String(encrypted_password));
     write_to_file(dir, &passwords)?;
 
+    write_to_log(dir, format!("Generated password for key {}.", key).as_str())?;
     println!("Generated and saved password for '{}':\n{}", key, password);
     Ok(())
 }
