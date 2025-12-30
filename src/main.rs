@@ -45,6 +45,14 @@ enum Commands {
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
+    Import {
+        #[arg(short, long = "file")]
+        file_path: Option<String>,
+        #[arg(short, long = "master")]
+        master_password: Option<String>,
+        #[arg(short, long, action=ArgAction::Set)]
+        overwrite: Option<bool>,
+    },
 }
 #[derive(Debug, Clone, ValueEnum)]
 enum ExportType {
@@ -99,5 +107,10 @@ fn main() -> Result<(), String> {
             file_type,
             master_password,
         } => backup::export_to_file(&home_dir, &file_path, &file_type, &master_password),
+        Commands::Import {
+            file_path,
+            master_password,
+            overwrite,
+        } => backup::import_from_file(&home_dir, &file_path, &master_password, overwrite),
     }
 }
