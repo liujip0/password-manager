@@ -36,26 +36,21 @@ enum Commands {
     },
 }
 
-fn main() {
+fn main() -> Result<(), String> {
     let cli = CLI::try_parse();
     let cli = match cli {
         Err(e) => {
-            eprintln!("Error parsing command line arguments\n\n{}", e);
-            std::process::exit(1);
+            return Err(format!("Could not parse command line arguments.\n\n{}", e));
         }
         Ok(cli) => cli,
     };
 
     let home_dir = std::env::home_dir();
-    let home_dir = match home_dir {
-        Some(dir) => dir,
-        None => {
-            eprintln!("Could not determine home directory");
-            std::process::exit(1);
-        }
+    let Some(home_dir) = home_dir else {
+        return Err("Could not determine home directory".to_string());
     };
 
-    let result = match cli.command {
+    match cli.command {
         Commands::List => commands::list(&home_dir),
         Commands::Get {
             key,
@@ -72,12 +67,5 @@ fn main() {
             length,
             master_password,
         } => commands::generate(&home_dir, &key, special_chars, length, &master_password),
-    };
-    match result {
-        Err(e) => {
-            eprintln!("Error executing command\n\n{}", e);
-            std::process::exit(1);
-        }
-        Ok(_) => {}
     }
 }
