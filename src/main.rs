@@ -2,6 +2,7 @@ use std::fmt::{self};
 
 use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
+mod autocomplete;
 mod backup;
 mod commands;
 mod password;

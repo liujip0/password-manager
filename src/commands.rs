@@ -5,7 +5,7 @@ use rand::Rng;
 use toml::Value;
 
 use crate::{
-    password,
+    autocomplete, password,
     storage::{self, write_to_file},
 };
 
@@ -31,10 +31,19 @@ pub fn get(
     key: &Option<String>,
     master_password: &Option<String>,
 ) -> Result<(), String> {
+    let passwords = storage::get_passwords_from_file(dir)?;
+
     let key = match key {
         Some(k) => k,
         None => &{
-            let key_input = Text::new("Key: ").prompt();
+            let autocomplete = autocomplete::KeyCompleter {
+                keys: passwords
+                    .keys()
+                    .cloned()
+                    .filter(|k| k != storage::VERSION_KEY)
+                    .collect(),
+            };
+            let key_input = Text::new("Key: ").with_autocomplete(autocomplete).prompt();
             match key_input {
                 Err(e) => {
                     return Err(format!("Could not read key input.\n\n{}", e));
@@ -56,8 +65,6 @@ pub fn get(
             }
         },
     };
-
-    let passwords = storage::get_passwords_from_file(dir)?;
 
     let password = match passwords.get(key) {
         Some(value) => {
@@ -103,10 +110,19 @@ pub fn set(
     value: &Option<String>,
     master_password: &Option<String>,
 ) -> Result<(), String> {
+    let mut passwords = storage::get_passwords_from_file(dir)?;
+
     let key = match key {
         Some(k) => k,
         None => &{
-            let key_input = Text::new("Key: ").prompt();
+            let autocomplete = autocomplete::KeyCompleter {
+                keys: passwords
+                    .keys()
+                    .cloned()
+                    .filter(|k| k != storage::VERSION_KEY)
+                    .collect(),
+            };
+            let key_input = Text::new("Key: ").with_autocomplete(autocomplete).prompt();
             match key_input {
                 Err(e) => {
                     return Err(format!("Could not read key input.\n\n{}", e));
@@ -142,8 +158,6 @@ pub fn set(
         },
     };
 
-    let mut passwords = storage::get_passwords_from_file(dir)?;
-
     let encrypted_password = password::encrypt(value, &master_password)?;
     passwords.insert(key.to_string(), Value::String(encrypted_password));
 
@@ -167,10 +181,19 @@ pub fn generate(
     length: Option<usize>,
     master_password: &Option<String>,
 ) -> Result<(), String> {
+    let mut passwords = storage::get_passwords_from_file(dir)?;
+
     let key = match key {
         Some(k) => k,
         None => &{
-            let key_input = Text::new("Key: ").prompt();
+            let autocomplete = autocomplete::KeyCompleter {
+                keys: passwords
+                    .keys()
+                    .cloned()
+                    .filter(|k| k != storage::VERSION_KEY)
+                    .collect(),
+            };
+            let key_input = Text::new("Key: ").with_autocomplete(autocomplete).prompt();
             match key_input {
                 Err(e) => {
                     return Err(format!("Could not read key input.\n\n{}", e));
@@ -256,7 +279,6 @@ pub fn generate(
         })
         .collect();
 
-    let mut passwords = storage::get_passwords_from_file(dir)?;
     let encrypted_password = password::encrypt(&password, &master_password)?;
     passwords.insert(key.to_string(), Value::String(encrypted_password));
     write_to_file(dir, &passwords)?;
