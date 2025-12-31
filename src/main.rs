@@ -13,25 +13,35 @@ mod storage;
 
 #[derive(Parser)]
 #[command(version, about, author)]
+#[command(help_template = "\
+    {name} v{version}    {author}\n\n\
+    {usage-heading}\n    {usage}\n\n\
+    {about-with-newline}\n\
+    {all-args}{after-help}")]
 struct CLI {
     #[command(subcommand)]
     command: Commands,
 }
 
+const SUBCOMMAND_HELP_TEMPLATE: &str = "\
+    {name}\n\n\
+    {about-with-newline}\n\
+    {usage-heading}\n    {usage}\n\n\
+    {all-args}{after-help}";
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// List the keys of all stored passwords
-    #[clap(aliases = ["ls", "l"])]
+    #[clap(aliases = ["ls", "l"], help_template = SUBCOMMAND_HELP_TEMPLATE)]
     List,
     /// Get a stored password by its key
-    #[clap(aliases = ["g"])]
+    #[clap(aliases = ["g"], help_template = SUBCOMMAND_HELP_TEMPLATE)]
     Get {
         key: Option<String>,
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
     /// Set a password for a given key
-    #[clap(aliases = ["s", "add"])]
+    #[clap(aliases = ["s", "add"], help_template = SUBCOMMAND_HELP_TEMPLATE)]
     Set {
         key: Option<String>,
         value: Option<String>,
@@ -39,18 +49,20 @@ enum Commands {
         master_password: Option<String>,
     },
     /// Generate a random password and store it with the given key
-    #[clap(aliases = ["gen"])]
+    #[clap(aliases = ["gen"], help_template = SUBCOMMAND_HELP_TEMPLATE)]
     Generate {
         key: Option<String>,
+        /// Whether to include !@#$%^& *()-_=+[]{};:,.?/ in the generated password
         #[arg(short, long = "special", action=ArgAction::Set)]
         special_chars: Option<bool>,
+        /// Length in characters of the generated password
         #[arg(short, long)]
         length: Option<usize>,
         #[arg(short, long = "master")]
         master_password: Option<String>,
     },
     /// Export all stored passwords to a plaintext file
-    #[clap(aliases = ["exp", "ex", "backup", "out"])]
+    #[clap(aliases = ["exp", "ex", "backup", "out"], help_template = SUBCOMMAND_HELP_TEMPLATE)]
     Export {
         #[arg(short, long = "file")]
         file_path: Option<String>,
@@ -60,7 +72,7 @@ enum Commands {
         master_password: Option<String>,
     },
     /// Import passwords from a file
-    #[clap(aliases = ["in", "restore", "load"])]
+    #[clap(aliases = ["in", "restore", "load"], help_template = SUBCOMMAND_HELP_TEMPLATE)]
     Import {
         #[arg(short, long = "file")]
         file_path: Option<String>,
