@@ -25,7 +25,7 @@ struct CLI {
 
 const SUBCOMMAND_HELP_TEMPLATE: &str = "\
     {name}\n\n\
-    {about-with-newline}\n\
+    {about}\n\n\
     {usage-heading}\n    {usage}\n\n\
     {all-args}{after-help}";
 #[derive(Debug, Subcommand)]
